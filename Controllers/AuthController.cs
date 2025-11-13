@@ -58,5 +58,34 @@ namespace DFindApi.Controllers
                 return StatusCode(500, new { mensaje = ex.Message });
             }
         }
+
+        /// <summary>
+/// Actualiza el perfil del usuario usando el CORREO actual como identificador.
+/// </summary>
+[HttpPut("profile/by-email/{correoActual}")]
+public async Task<ActionResult<AuthResponse>> UpdateProfileByEmail(
+    string correoActual,
+    [FromBody] UpdateProfileRequest request)
+{
+    try
+    {
+        var user = await _repo.ActualizarPerfilPorCorreoAsync(correoActual, request);
+
+        if (user == null)
+            return NotFound(new { mensaje = "Usuario no encontrado." });
+
+        return Ok(user);
+    }
+    catch (SqlException ex)
+    {
+        // Por ejemplo, si el nuevo correo ya está en uso (RAISERROR en el SP)
+        return BadRequest(new { mensaje = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { mensaje = ex.Message });
+    }
+}
+
     }
 }

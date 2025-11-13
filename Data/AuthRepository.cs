@@ -99,5 +99,97 @@ namespace DFindApi.Data
                 ActualizadoEl = (DateTime)reader["ActualizadoEl"]
             };
         }
+        private async Task<AuthResponse?> ObtenerUsuarioPorIdAsync(int idUsuario)
+{
+    using var conn = new SqlConnection(_connectionString);
+    using var cmd = new SqlCommand(@"
+        SELECT IdUsuario, NombreUsuario, Correo, RutaImagenPerfil, TamanoFuente,
+               ModoOscuro, NotificacionesSonido, NotificacionesVibracion,
+               AceptoTerminos, FechaAceptoTerminos, VersionTerminos, IpAceptacion,
+               CreadoEl, ActualizadoEl
+        FROM Usuarios
+        WHERE IdUsuario = @IdUsuario AND Activo = 1;
+    ", conn);
+
+    cmd.Parameters.AddWithValue("@IdUsuario", idUsuario);
+
+    await conn.OpenAsync();
+    using var reader = await cmd.ExecuteReaderAsync();
+
+    if (!await reader.ReadAsync())
+        return null;
+
+    return new AuthResponse
+    {
+        IdUsuario = (int)reader["IdUsuario"],
+        NombreUsuario = reader["NombreUsuario"].ToString() ?? "",
+        Correo = reader["Correo"].ToString() ?? "",
+        RutaImagenPerfil = reader["RutaImagenPerfil"] as string,
+        TamanoFuente = (decimal)reader["TamanoFuente"],
+        ModoOscuro = (bool)reader["ModoOscuro"],
+        NotificacionesSonido = (bool)reader["NotificacionesSonido"],
+        NotificacionesVibracion = (bool)reader["NotificacionesVibracion"],
+        AceptoTerminos = (bool)reader["AceptoTerminos"],
+        FechaAceptoTerminos = reader["FechaAceptoTerminos"] == DBNull.Value
+            ? null
+            : (DateTime?)reader["FechaAceptoTerminos"],
+        VersionTerminos = reader["VersionTerminos"] as string,
+        IpAceptacion = reader["IpAceptacion"] as string,
+        CreadoEl = (DateTime)reader["CreadoEl"],
+        ActualizadoEl = (DateTime)reader["ActualizadoEl"]
+    };
+}
+    private async Task<int?> ObtenerIdUsuarioPorCorreoAsync(string correo)
+{
+    using var conn = new SqlConnection(_connectionString);
+    using var cmd = new SqlCommand(@"
+        SELECT IdUsuario
+        FROM Usuarios
+        WHERE Correo = @Correo AND Activo = 1;
+    ", conn);
+
+    cmd.Parameters.AddWithValue("@Correo", correo);
+
+    await conn.OpenAsync();
+    var result = await cmd.ExecuteScalarAsync();
+
+    if (result == null || result == DBNull.Value)
+        return null;
+
+    return (int)result;
+}
+public async Task<AuthResponse?> ActualizarPerfilPorCorreoAsync(
+    string correoActual,
+    UpdateProfileRequest request)
+{
+    // 1) Buscar el IdUsuario a partir del correo actual
+    var idUsuario = await ObtenerIdUsuarioPorCorreoAsync(correoActual);
+    if (idUsuario == null)
+    {
+        return null; // usuario no encontrado
+    }
+
+    // 2) Llamar al SP sp_ActualizarPerfilUsuario con ese Id
+    using var conn = new SqlConnection(_connectionString);
+    using var cmd = new SqlCommand("sp_ActualizarPerfilUsuario", conn)
+    {
+        CommandType = CommandType.StoredProcedure
+    };
+
+    cmd.Parameters.AddWithValue("@IdUsuario", idUsuario.Value);
+
+    // Nuevos valores; si vienen null, el SP mantiene los actuales
+    cmd.Parameters.AddWithValue("@NombreUsuario",
+        (object?)request.NombreUsuario ?? DBNull.Value);
+    cmd.Parameters.AddWithValue("@Correo",
+        (object?)request.Correo ?? DBNull.Value);
+
+    await conn.OpenAsync();
+    await cmd.ExecuteNonQueryAsync();
+
+    // 3) Devolver el usuario ya actualizado
+    return await ObtenerUsuarioPorIdAsync(idUsuario.Value);
+}
+
     }
 }

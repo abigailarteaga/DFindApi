@@ -76,3 +76,4 @@ C:\Users\USUARIO\DFindApi\obj\Debug\net9.0\refint\DFindApi.dll
 C:\Users\USUARIO\DFindApi\obj\Debug\net9.0\DFindApi.pdb
 C:\Users\USUARIO\DFindApi\obj\Debug\net9.0\DFindApi.genruntimeconfig.cache
 C:\Users\USUARIO\DFindApi\obj\Debug\net9.0\ref\DFindApi.dll
+C:\Users\USUARIO\DFindApi\obj\Debug\net9.0\DFindApi.sourcelink.json
