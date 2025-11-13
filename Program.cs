@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -14,21 +15,20 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// aquí registramos AuthRepository
+// Repos
 builder.Services.AddScoped<AuthRepository>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// 👇 QUITA el if (solo desarrollo) y deja Swagger SIEMPRE
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "DFind API V1");
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DFind API v1");
+});
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();
