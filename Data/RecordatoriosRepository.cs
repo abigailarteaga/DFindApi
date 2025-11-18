@@ -35,7 +35,7 @@ namespace DFindApi.Data
                 cmd.Parameters.AddWithValue("@IdRecordatorio", idRecordatorio);
                 cmd.Parameters.AddWithValue("@IdUsuario", request.IdUsuario);
                 cmd.Parameters.AddWithValue("@Titulo", request.Titulo);
-                cmd.Parameters.AddWithValue("@Descripcion", request.Descripcion);
+                cmd.Parameters.AddWithValue("@Descripcion", (object?)request.Descripcion ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@FechaHora", request.FechaHora);
                 cmd.Parameters.AddWithValue("@Prioridad", request.Prioridad);
                 cmd.Parameters.AddWithValue("@Ubicacion", request.Ubicacion);
