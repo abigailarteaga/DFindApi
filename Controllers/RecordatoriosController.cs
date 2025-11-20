@@ -15,10 +15,6 @@ namespace DFindApi.Controllers
         {
             _repo = repo;
         }
-
-        /// <summary>
-        /// Crea un nuevo recordatorio.
-        /// </summary>
         [HttpPost]
         public async Task<ActionResult<RecordatorioResponse>> CrearRecordatorio([FromBody] RecordatorioRequest request)
         {

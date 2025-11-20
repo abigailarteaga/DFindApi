@@ -31,6 +31,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<AuthRepository>();
 builder.Services.AddScoped<RecordatoriosRepository>();
 builder.Services.AddScoped<PendientesRepository>();
+builder.Services.AddScoped<UsersRepository>();
+
 
 var app = builder.Build();
 

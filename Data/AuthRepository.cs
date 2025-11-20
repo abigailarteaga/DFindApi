@@ -158,38 +158,5 @@ namespace DFindApi.Data
 
     return (int)result;
 }
-public async Task<AuthResponse?> ActualizarPerfilPorCorreoAsync(
-    string correoActual,
-    UpdateProfileRequest request)
-{
-    // 1) Buscar el IdUsuario a partir del correo actual
-    var idUsuario = await ObtenerIdUsuarioPorCorreoAsync(correoActual);
-    if (idUsuario == null)
-    {
-        return null; // usuario no encontrado
-    }
-
-    // 2) Llamar al SP sp_ActualizarPerfilUsuario con ese Id
-    using var conn = new SqlConnection(_connectionString);
-    using var cmd = new SqlCommand("sp_ActualizarPerfilUsuario", conn)
-    {
-        CommandType = CommandType.StoredProcedure
-    };
-
-    cmd.Parameters.AddWithValue("@IdUsuario", idUsuario.Value);
-
-    // Nuevos valores; si vienen null, el SP mantiene los actuales
-    cmd.Parameters.AddWithValue("@NombreUsuario",
-        (object?)request.NombreUsuario ?? DBNull.Value);
-    cmd.Parameters.AddWithValue("@Correo",
-        (object?)request.Correo ?? DBNull.Value);
-
-    await conn.OpenAsync();
-    await cmd.ExecuteNonQueryAsync();
-
-    // 3) Devolver el usuario ya actualizado
-    return await ObtenerUsuarioPorIdAsync(idUsuario.Value);
-}
-
     }
 }
