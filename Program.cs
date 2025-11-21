@@ -29,7 +29,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<AuthRepository>();
 builder.Services.AddScoped<RecordatoriosRepository>();
 builder.Services.AddScoped<PendientesRepository>();
-builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<EmailService>();
 
 var app = builder.Build();
 

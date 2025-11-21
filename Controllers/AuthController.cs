@@ -181,9 +181,6 @@ namespace DFindApi.Controllers
             await _emailService.EnviarCorreoAsync(request.Correo, asunto, cuerpo);
 
             return Ok(new { mensaje = "Código enviado al correo proporcionado." });
-                await _emailService.EnviarCorreoAsync(request.Correo, asunto, cuerpo);
-
-                return Ok(new { mensaje = "Código enviado." });
             }
             catch (Exception ex)
             {
