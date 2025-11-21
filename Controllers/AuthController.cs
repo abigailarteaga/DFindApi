@@ -78,7 +78,10 @@ namespace DFindApi.Controllers
         [HttpPost("enviar-codigo")]
         public async Task<IActionResult> EnviarCodigoVerificacion([FromBody] EnviarCodigoVerificacionRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Correo))
+            try
+            {
+                
+                 if (string.IsNullOrWhiteSpace(request.Correo))
                 return BadRequest(new { mensaje = "El correo es obligatorio." });
 
             var codigo = await _repo.GenerarYGuardarCodigoVerificacionAsync(request.Correo);
@@ -178,6 +181,15 @@ namespace DFindApi.Controllers
             await _emailService.EnviarCorreoAsync(request.Correo, asunto, cuerpo);
 
             return Ok(new { mensaje = "Código enviado al correo proporcionado." });
+                await _emailService.EnviarCorreoAsync(request.Correo, asunto, cuerpo);
+
+                return Ok(new { mensaje = "Código enviado." });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[ENVIAR-CODIGO ERROR] " + ex);
+                return StatusCode(500, new { mensaje = "Error enviando correo.", detalle = ex.Message });
+            }
         }
                 [HttpPost("verificar-codigo")]
         public async Task<IActionResult> VerificarCodigo([FromBody] VerificarCodigoRequest request)
