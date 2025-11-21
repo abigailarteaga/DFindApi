@@ -15,13 +15,16 @@ namespace DFindApi.Controllers
             _repo = repo;
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUserById(int id)
+        [HttpGet]
+        public async Task<ActionResult<User>> GetUserByEmail([FromQuery] string correo)
         {
-            var user = await _repo.GetByIdAsync(id);
+            if (string.IsNullOrWhiteSpace(correo))
+                return BadRequest("El correo es obligatorio.");
+
+            var user = await _repo.GetByEmailAsync(correo);
 
             if (user == null)
-                return NotFound($"Usuario con ID {id} no encontrado.");
+                return NotFound($"Usuario con correo {correo} no encontrado.");
 
             return Ok(user);
         }
