@@ -1,4 +1,5 @@
 // Data/UsersRepository.cs
+using System;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +18,50 @@ namespace DFindApi.Data
 
         private SqlConnection GetConnection()
             => new SqlConnection(_config.GetConnectionString("DefaultConnection"));
+
+        public async Task<User?> GetByIdAsync(int idUsuario)
+        {
+            const string sql = @"
+                SELECT  u.id_usuario,
+                        u.nombre_usuario,
+                        u.email,
+                        u.contrasena_hash,
+                        u.fecha_creacion,
+                        u.telefono,
+                        u.avatar_tipo,
+                        u.avatar_clave
+                FROM users u
+                WHERE u.id_usuario = @IdUsuario;";
+
+            using var conn = GetConnection();
+            await conn.OpenAsync();
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@IdUsuario", idUsuario);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            if (!await reader.ReadAsync())
+                return null;
+
+            return new User
+            {
+                IdUsuario      = reader.GetInt32(reader.GetOrdinal("id_usuario")),
+                NombreUsuario  = reader.GetString(reader.GetOrdinal("nombre_usuario")),
+                Email          = reader.GetString(reader.GetOrdinal("email")),
+                ContrasenaHash = reader.GetString(reader.GetOrdinal("contrasena_hash")),
+                FechaCreacion  = reader.GetDateTime(reader.GetOrdinal("fecha_creacion")),
+                Telefono       = reader.IsDBNull(reader.GetOrdinal("telefono"))
+                                    ? string.Empty
+                                    : reader.GetString(reader.GetOrdinal("telefono")),
+                AvatarTipo     = reader.IsDBNull(reader.GetOrdinal("avatar_tipo"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("avatar_tipo")),
+                AvatarClave    = reader.IsDBNull(reader.GetOrdinal("avatar_clave"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("avatar_clave")),
+            };
+        }
 
         public async Task UpdateProfileAsync(UpdateProfileRequest request)
         {

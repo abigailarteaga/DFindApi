@@ -15,6 +15,17 @@ namespace DFindApi.Controllers
             _repo = repo;
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<User>> GetUserById(int id)
+        {
+            var user = await _repo.GetByIdAsync(id);
+
+            if (user == null)
+                return NotFound($"Usuario con ID {id} no encontrado.");
+
+            return Ok(user);
+        }
+
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
         {
