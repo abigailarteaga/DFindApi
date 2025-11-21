@@ -313,6 +313,21 @@ namespace DFindApi.Controllers
 
         return Ok(new { mensaje = "Contraseña actualizada correctamente." });
     }
+    [HttpGet("smtp-check")]
+public IActionResult SmtpCheck([FromServices] IConfiguration config)
+{
+    var smtp = config.GetSection("Smtp");
+    return Ok(new
+    {
+        Host = smtp["Host"],
+        Port = smtp["Port"],
+        User = smtp["User"],
+        EnableSsl = smtp["EnableSsl"],
+        FromName = smtp["FromName"]
+    });
+}
+
+
     }
 }
 
