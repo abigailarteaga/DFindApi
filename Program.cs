@@ -1,13 +1,12 @@
 using DFindApi.Data;
 using Microsoft.OpenApi.Models;
+using DFindApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Configurar CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -27,23 +26,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Repos
 builder.Services.AddScoped<AuthRepository>();
 builder.Services.AddScoped<RecordatoriosRepository>();
 builder.Services.AddScoped<PendientesRepository>();
-builder.Services.AddScoped<UsersRepository>();
-
+builder.Services.AddScoped<EmailService>();
 
 var app = builder.Build();
 
-// 👇 QUITA el if (solo desarrollo) y deja Swagger SIEMPRE
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "DFind API v1");
 });
 
-// Usar CORS
 app.UseCors("AllowAll");
 
 app.UseHttpsRedirection();

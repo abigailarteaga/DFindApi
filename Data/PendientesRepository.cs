@@ -17,14 +17,12 @@ namespace DFindApi.Data
         private SqlConnection GetConnection()
             => new SqlConnection(_config.GetConnectionString("DefaultConnection"));
 
-        // 1) Crear pendiente por correo
         public async Task<PendienteResponse> CreatePendienteForEmailAsync(
             PendienteCreateRequest request)
         {
             using var conn = GetConnection();
             await conn.OpenAsync();
 
-            // Buscar IdUsuario por correo
             int? idUsuario = null;
             using (var cmdUser = new SqlCommand(@"
                 SELECT IdUsuario
@@ -41,10 +39,8 @@ namespace DFindApi.Data
             if (idUsuario == null)
                 throw new InvalidOperationException("Usuario no encontrado para el correo especificado.");
 
-            // Generar IdPendiente
             var idPendiente = $"pend_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
 
-            // Crear pendiente con sp_CrearPendiente
             using (var cmd = new SqlCommand("sp_CrearPendiente", conn))
             {
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -69,14 +65,13 @@ namespace DFindApi.Data
                 Lugar         = request.Lugar,
                 Categoria     = request.Categoria ?? string.Empty,
                 Cantidad      = request.Cantidad,
-                EstaComprado  = false,   // 👈 se crea SIN tachar
-                Eliminado     = false,   // 👈 se crea NO eliminado
+                EstaComprado  = false,
+                Eliminado     = false,
                 CreadoEl      = now,
                 ActualizadoEl = now
             };
         }
 
-        // 2) Listar pendientes por correo (solo no eliminados)
         public async Task<List<PendienteResponse>> GetPendientesByEmailAsync(
             string correoUsuario,
             bool? soloComprados = null)
@@ -84,7 +79,6 @@ namespace DFindApi.Data
             using var conn = GetConnection();
             await conn.OpenAsync();
 
-            // Buscar IdUsuario
             int? idUsuario = null;
             using (var cmdUser = new SqlCommand(@"
                 SELECT IdUsuario
@@ -132,15 +126,13 @@ namespace DFindApi.Data
                 });
             }
 
-            // Ordenar por lugar y fecha de creación (ideal para agrupar en Flutter)
             return list
-                .Where(p => !p.Eliminado)   // seguridad extra por si el SP no filtró
+                .Where(p => !p.Eliminado)
                 .OrderBy(p => p.Lugar)
                 .ThenByDescending(p => p.CreadoEl)
                 .ToList();
         }
 
-        // 3) Alternar estado comprado (tachado / no tachado)
         public async Task ToggleCompradoAsync(string idPendiente)
         {
             using var conn = GetConnection();
@@ -167,7 +159,7 @@ namespace DFindApi.Data
                 SET Eliminado = 1,
                     ActualizadoEl = SYSUTCDATETIME()
                 WHERE IdPendiente = @IdPendiente;
-            ", conn);   // 👈 aquí va el ; y solo un )
+            ", conn);
 
             cmd.Parameters.AddWithValue("@IdPendiente", idPendiente);
 
@@ -175,7 +167,7 @@ namespace DFindApi.Data
             if (rows == 0)
                 throw new InvalidOperationException("Pendiente no encontrado.");
         }
-        // Buscar pendiente por correo + nombre (y opcionalmente lugar) y alternar comprado
+        
         public async Task ToggleCompradoByEmailAndNombreAsync(
             string correoUsuario,
             string nombrePendiente,
@@ -184,7 +176,6 @@ namespace DFindApi.Data
             using var conn = GetConnection();
             await conn.OpenAsync();
 
-            // 1) Buscar IdUsuario
             int? idUsuario = null;
             using (var cmdUser = new SqlCommand(@"
                 SELECT IdUsuario
@@ -201,7 +192,6 @@ namespace DFindApi.Data
             if (idUsuario == null)
                 throw new InvalidOperationException("Usuario no encontrado para el correo especificado.");
 
-            // 2) Buscar el IdPendiente según nombre (y opcionalmente lugar)
             string? idPendiente = null;
             using (var cmdPend = new SqlCommand(@"
                 SELECT TOP 1 IdPendiente
@@ -226,7 +216,6 @@ namespace DFindApi.Data
             if (idPendiente == null)
                 throw new InvalidOperationException("No se encontró un pendiente con ese nombre (y lugar) para este usuario.");
 
-            // 3) Alternar comprado usando el SP existente
             using var cmdToggle = new SqlCommand("sp_AlternarPendienteComprado", conn)
             {
                 CommandType = CommandType.StoredProcedure
@@ -246,7 +235,6 @@ namespace DFindApi.Data
             using var conn = GetConnection();
             await conn.OpenAsync();
 
-            // 1) Buscar IdUsuario
             int? idUsuario = null;
             using (var cmdUser = new SqlCommand(@"
                 SELECT IdUsuario
@@ -263,7 +251,6 @@ namespace DFindApi.Data
             if (idUsuario == null)
                 throw new InvalidOperationException("Usuario no encontrado para el correo especificado.");
 
-            // 2) Buscar el IdPendiente más reciente con ese nombre (y lugar)
             string? idPendiente = null;
             using (var cmdPend = new SqlCommand(@"
                 SELECT TOP 1 IdPendiente
@@ -288,7 +275,6 @@ namespace DFindApi.Data
             if (idPendiente == null)
                 throw new InvalidOperationException("No se encontró un pendiente con ese nombre (y lugar) para este usuario.");
 
-            // 3) Marcar Eliminado = 1 por IdPendiente (sin ORDER BY)
             using var cmd = new SqlCommand(@"
                 UPDATE Pendientes
                 SET Eliminado = 1,
@@ -302,8 +288,6 @@ namespace DFindApi.Data
             if (rows == 0)
                 throw new InvalidOperationException("Pendiente no encontrado al intentar eliminar.");
         }
-
-
 
     }
 }

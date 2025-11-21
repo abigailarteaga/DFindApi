@@ -1,4 +1,5 @@
 using System.Data;
+using System.Security.Cryptography;
 using DFindApi.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -14,8 +15,6 @@ namespace DFindApi.Data
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                                ?? throw new Exception("Connection string no encontrada.");
         }
-
-        // REGISTRO
         public async Task<AuthResponse?> RegistrarAsync(RegisterRequest request)
         {
             int idNuevoUsuario;
@@ -45,8 +44,6 @@ namespace DFindApi.Data
 
                 idNuevoUsuario = (int)idOutput.Value;
             }
-
-            // Obtenemos los datos completos llamando a sp_AutenticarUsuario
             var usuario = await ObtenerUsuarioPorCorreoYHashAsync(
                 request.Correo,
                 request.ContrasenaHash
@@ -54,14 +51,10 @@ namespace DFindApi.Data
 
             return usuario;
         }
-
-        // LOGIN
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             return await ObtenerUsuarioPorCorreoYHashAsync(request.Correo, request.ContrasenaHash);
         }
-
-        // Método reutilizable
         private async Task<AuthResponse?> ObtenerUsuarioPorCorreoYHashAsync(string correo, string hash)
         {
             using var conn = new SqlConnection(_connectionString);
@@ -158,5 +151,116 @@ namespace DFindApi.Data
 
     return (int)result;
 }
+public async Task<AuthResponse?> ActualizarPerfilPorCorreoAsync(
+    string correoActual,
+    UpdateProfileRequest request)
+{
+    var idUsuario = await ObtenerIdUsuarioPorCorreoAsync(correoActual);
+    if (idUsuario == null)
+    {
+        return null;
+    }
+
+    using var conn = new SqlConnection(_connectionString);
+    using var cmd = new SqlCommand("sp_ActualizarPerfilUsuario", conn)
+    {
+        CommandType = CommandType.StoredProcedure
+    };
+
+    cmd.Parameters.AddWithValue("@IdUsuario", idUsuario.Value);
+
+    cmd.Parameters.AddWithValue("@NombreUsuario",
+        (object?)request.NombreUsuario ?? DBNull.Value);
+    cmd.Parameters.AddWithValue("@Correo",
+        (object?)request.Correo ?? DBNull.Value);
+
+    await conn.OpenAsync();
+    await cmd.ExecuteNonQueryAsync();
+
+    return await ObtenerUsuarioPorIdAsync(idUsuario.Value);
+}
+
+    public async Task<string?> GenerarYGuardarCodigoVerificacionAsync(string correo, int minutosValidez = 10)
+    {
+        var codigo = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand(@"
+            UPDATE Usuarios
+               SET CodigoVerificacion = @Codigo,
+                   CodigoVerificacionExpira = DATEADD(MINUTE, @Minutos, SYSUTCDATETIME())
+             WHERE Correo = @Correo
+               AND Activo = 1;
+            
+            SELECT @@ROWCOUNT;
+        ", conn);
+
+        cmd.Parameters.AddWithValue("@Codigo", codigo);
+        cmd.Parameters.AddWithValue("@Minutos", minutosValidez);
+        cmd.Parameters.AddWithValue("@Correo", correo);
+
+        await conn.OpenAsync();
+        var rows = (int)await cmd.ExecuteScalarAsync();
+
+        if (rows == 0)
+        {
+            // No se encontró usuario
+            return null;
+        }
+
+        return codigo;
+    }
+
+    public async Task<bool> VerificarCodigoAsync(string correo, string codigo)
+    {
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand(@"
+            SELECT CodigoVerificacion, CodigoVerificacionExpira
+            FROM Usuarios
+            WHERE Correo = @Correo
+              AND Activo = 1;
+        ", conn);
+
+        cmd.Parameters.AddWithValue("@Correo", correo);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+            return false;
+
+        var codigoDb = reader["CodigoVerificacion"] as string;
+        var expira = reader["CodigoVerificacionExpira"] as DateTime?;
+
+        if (string.IsNullOrEmpty(codigoDb) || !expira.HasValue)
+            return false;
+
+        // Comprobar expiración
+        if (DateTime.UtcNow > expira.Value)
+            return false;
+
+        // Comparar código
+        if (!string.Equals(codigoDb, codigo, StringComparison.Ordinal))
+            return false;
+
+        // Si es correcto, marcamos el email como verificado y limpiamos el código
+        reader.Close();
+
+        using var cmdUpdate = new SqlCommand(@"
+            UPDATE Usuarios
+               SET EmailVerificado = 1,
+                   CodigoVerificacion = NULL,
+                   CodigoVerificacionExpira = NULL,
+                   ActualizadoEl = SYSUTCDATETIME()
+             WHERE Correo = @Correo
+               AND Activo = 1;
+        ", conn);
+
+        cmdUpdate.Parameters.AddWithValue("@Correo", correo);
+        await cmdUpdate.ExecuteNonQueryAsync();
+
+        return true;
+    }
+
     }
 }

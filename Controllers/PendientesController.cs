@@ -14,9 +14,6 @@ namespace DFindApi.Controllers
         {
             _repo = repo;
         }
-
-        // POST /api/Pendientes
-        // Crea pendiente con EstaComprado = false, Eliminado = false
         [HttpPost]
         public async Task<ActionResult<PendienteResponse>> CrearPendiente(
             [FromBody] PendienteCreateRequest request)
@@ -40,8 +37,6 @@ namespace DFindApi.Controllers
                 throw;
             }
         }
-
-        // GET /api/Pendientes/by-email/{correo}?soloComprados=false
         [HttpGet("by-email/{correoUsuario}")]
         public async Task<ActionResult<List<PendienteResponse>>> GetPendientesPorCorreo(
             string correoUsuario,
@@ -59,7 +54,6 @@ namespace DFindApi.Controllers
                 throw;
             }
         }
-        // PUT /api/Pendientes/by-email/{correoUsuario}/toggle-comprado-por-nombre?nombre=Leche&lugar=Supermaxi
         [HttpPut("by-email/{correoUsuario}/toggle-comprado-por-nombre")]
         public async Task<IActionResult> ToggleCompradoPorNombre(
             string correoUsuario,
@@ -84,9 +78,6 @@ namespace DFindApi.Controllers
                 throw;
             }
         }
-
-
-        // PUT /api/Pendientes/by-email/{correoUsuario}/eliminar-por-nombre?nombre=Leche&lugar=Supermaxi
         [HttpPut("by-email/{correoUsuario}/eliminar-por-nombre")]
         public async Task<IActionResult> EliminarPorNombre(
             string correoUsuario,

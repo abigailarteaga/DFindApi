@@ -14,8 +14,6 @@ namespace DFindApi.Data
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                                ?? throw new Exception("Connection string no encontrada.");
         }
-
-        // CREAR RECORDATORIO
         public async Task<RecordatorioResponse?> CrearRecordatorioAsync(RecordatorioRequest request)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -54,11 +52,6 @@ namespace DFindApi.Data
             }
         }
 
-
-
-
-
-        // OBTENER RECORDATORIOS POR CORREO DEL USUARIO
         public async Task<List<RecordatorioResponse>> ObtenerRecordatoriosPorCorreoAsync(string correo)
         {
             var recordatorios = new List<RecordatorioResponse>();
@@ -105,7 +98,6 @@ namespace DFindApi.Data
             return recordatorios;
         }
 
-        // ACTUALIZAR RECORDATORIO POR TÍTULO
         public async Task<RecordatorioResponse?> ActualizarRecordatorioPorTituloAsync(string titulo, ActualizarRecordatorioPorTituloRequest request)
         {
             var parametrosActualizacion = new List<string>();
@@ -179,11 +171,8 @@ namespace DFindApi.Data
 
             if (parametrosActualizacion.Count == 0)
             {
-                // No hay nada que actualizar, devolver el recordatorio actual
                 return await ObtenerRecordatorioPorTituloAsync(titulo);
             }
-
-            // Agregar ActualizadoEl automáticamente
             parametrosActualizacion.Add("ActualizadoEl = SYSUTCDATETIME()");
 
             var sql = $@"
@@ -204,13 +193,12 @@ namespace DFindApi.Data
                 var filasAfectadas = await cmd.ExecuteNonQueryAsync();
 
                 if (filasAfectadas == 0)
-                    return null; // Recordatorio no encontrado
+                    return null;
             }
 
             return await ObtenerRecordatorioPorTituloAsync(titulo);
         }
 
-        // ELIMINAR RECORDATORIO POR TÍTULO
         public async Task<bool> EliminarRecordatorioPorTituloAsync(string titulo)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -227,7 +215,6 @@ namespace DFindApi.Data
             }
         }
 
-        // CAMBIAR ESTADO POR TÍTULO
         public async Task<RecordatorioResponse?> CambiarEstadoPorTituloAsync(string titulo)
         {
             var recordatorioActual = await ObtenerRecordatorioPorTituloAsync(titulo);
@@ -253,7 +240,6 @@ namespace DFindApi.Data
             return await ObtenerRecordatorioPorTituloAsync(titulo);
         }
 
-        // Método auxiliar para obtener un recordatorio por título
         private async Task<RecordatorioResponse?> ObtenerRecordatorioPorTituloAsync(string titulo)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -294,7 +280,6 @@ namespace DFindApi.Data
             }
         }
 
-        // Método auxiliar para obtener un recordatorio por ID
         private async Task<RecordatorioResponse?> ObtenerRecordatorioPorIdAsync(string idRecordatorio)
         {
             using (var conn = new SqlConnection(_connectionString))
