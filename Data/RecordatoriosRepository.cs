@@ -319,5 +319,56 @@ namespace DFindApi.Data
                 };
             }
         }
+        public async Task<bool> EliminarMoviendoAPapeleraPorTituloAsync(
+            string correoUsuario,
+            string titulo)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var cmd = new SqlCommand("sp_MoverRecordatorioAPapeleraPorTitulo", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            cmd.Parameters.AddWithValue("@CorreoUsuario", correoUsuario);
+            cmd.Parameters.AddWithValue("@Titulo", titulo);
+
+            try
+            {
+                await cmd.ExecuteNonQueryAsync();
+                return true;
+            }
+            catch (SqlException ex) when (ex.Message.Contains("RECORDATORIO_NO_ENCONTRADO"))
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> RestaurarRecordatorioDesdePapeleraPorTituloAsync(
+            string correoUsuario,
+            string titulo)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand("sp_RestaurarRecordatorioDesdePapeleraPorTitulo", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            cmd.Parameters.AddWithValue("@CorreoUsuario", correoUsuario);
+            cmd.Parameters.AddWithValue("@Titulo", titulo);
+
+            await conn.OpenAsync();
+
+            try
+            {
+                var filasAfectadas = await cmd.ExecuteNonQueryAsync();
+                return filasAfectadas > 0;
+            }
+            catch (SqlException ex)
+            {
+                throw;
+            }
+        }
     }
 }

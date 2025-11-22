@@ -37,12 +37,6 @@ namespace DFindApi.Controllers
                 return StatusCode(500, new { mensaje = ex.Message });
             }
         }
-
-
-
-        /// <summary>
-        /// Actualiza un recordatorio por título.
-        /// </summary>
         [HttpPut("titulo/{titulo}")]
         public async Task<ActionResult<RecordatorioResponse>> ActualizarRecordatorioPorTitulo(
             string titulo, 
@@ -66,31 +60,47 @@ namespace DFindApi.Controllers
                 return StatusCode(500, new { mensaje = ex.Message });
             }
         }
-
-        /// <summary>
-        /// Elimina un recordatorio por título.
-        /// </summary>
-        [HttpDelete("titulo/{titulo}")]
-        public async Task<ActionResult> EliminarRecordatorioPorTitulo(string titulo)
+        [HttpDelete("mover-a-papelera")]
+        public async Task<IActionResult> EliminarMoviendoAPapeleraPorTitulo(
+            [FromBody] MoverRecordatorioAPapeleraRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.CorreoUsuario) ||
+                string.IsNullOrWhiteSpace(request.Titulo))
+            {
+                return BadRequest(new { mensaje = "correoUsuario y titulo son obligatorios." });
+            }
+
             try
             {
-                var eliminado = await _repo.EliminarRecordatorioPorTituloAsync(titulo);
+                var exito = await _repo
+                    .EliminarMoviendoAPapeleraPorTituloAsync(
+                        request.CorreoUsuario,
+                        request.Titulo);
 
-                if (!eliminado)
+                if (!exito)
+                {
                     return NotFound(new { mensaje = "Recordatorio no encontrado." });
+                }
 
-                return Ok(new { mensaje = "Recordatorio eliminado exitosamente." });
+                return Ok(new { mensaje = "Recordatorio movido a la papelera correctamente." });
+            }
+            catch (SqlException ex)
+            {
+                return StatusCode(500, new
+                {
+                    mensaje = "Error al eliminar el recordatorio.",
+                    detalle = ex.Message
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { mensaje = ex.Message });
+                return StatusCode(500, new
+                {
+                    mensaje = "Error inesperado al eliminar el recordatorio.",
+                    detalle = ex.Message
+                });
             }
         }
-
-        /// <summary>
-        /// Cambia el estado activo/inactivo de un recordatorio por título.
-        /// </summary>
         [HttpPatch("titulo/{titulo}/toggle-activo")]
         public async Task<ActionResult<RecordatorioResponse>> CambiarEstadoRecordatorioPorTitulo(string titulo)
         {
@@ -108,10 +118,6 @@ namespace DFindApi.Controllers
                 return StatusCode(500, new { mensaje = ex.Message });
             }
         }
-
-        /// <summary>
-        /// Obtiene todos los recordatorios de un usuario por su correo electrónico.
-        /// </summary>
         [HttpGet("usuario-por-correo")]
         public async Task<ActionResult<List<RecordatorioResponse>>> ObtenerRecordatoriosPorCorreo([FromQuery] string correo)
         {
@@ -128,6 +134,33 @@ namespace DFindApi.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { mensaje = ex.Message });
+            }
+        }
+        [HttpPost("restaurar-desde-papelera")]
+        public async Task<IActionResult> RestaurarDesdePapelera(
+            [FromBody] MoverRecordatorioAPapeleraRequest request)
+        {
+            try
+            {
+                var ok = await _repo
+                    .RestaurarRecordatorioDesdePapeleraPorTituloAsync(
+                        request.CorreoUsuario,
+                        request.Titulo);
+
+                if (!ok)
+                {
+                    return NotFound(new { mensaje = "Elemento en papelera no encontrado." });
+                }
+
+                return Ok(new { mensaje = "Recordatorio restaurado correctamente." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    mensaje = "Error al restaurar el recordatorio.",
+                    detalle = ex.Message
+                });
             }
         }
     }
