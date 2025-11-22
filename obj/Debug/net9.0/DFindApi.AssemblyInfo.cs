@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DFindApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fc102959786e669903d7ecb72b30bafb1b8fb40b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c14518004c37d230d76cebe4278d792ad53541ca")]
 [assembly: System.Reflection.AssemblyProductAttribute("DFindApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DFindApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
