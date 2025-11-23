@@ -66,18 +66,20 @@ namespace DFindApi.Data
         public async Task<User?> GetByEmailAsync(string correo)
         {
             const string sql = @"
-                SELECT  u.id_usuario,
-                        u.nombre_usuario,
-                        u.email,
-                        u.contrasena_hash,
-                        u.fecha_creacion,
-                        u.telefono,
-                        u.avatar_tipo,
-                        u.avatar_clave
-                FROM users u
-                WHERE u.email = @Correo;";
+            SELECT
+                u.IdUsuario      AS id_usuario,
+                u.NombreUsuario  AS nombre_usuario,
+                u.Correo         AS email,
+                u.ContrasenaHash AS contrasena_hash,
+                u.RegistradoEl   AS fecha_creacion,
+                ''               AS telefono,      -- si no tienes columna Teléfono
+                u.AvatarTipo     AS avatar_tipo,
+                u.AvatarClave    AS avatar_clave
+            FROM dbo.Usuarios u
+            WHERE u.Correo = @Correo;";
 
-            using var conn = GetConnection();
+
+            using var conn = new SqlConnection(_config.GetConnectionString("DefaultConnection"));
             await conn.OpenAsync();
 
             using var cmd = new SqlCommand(sql, conn);
@@ -88,6 +90,10 @@ namespace DFindApi.Data
             if (!await reader.ReadAsync())
                 return null;
 
+            return MapToUser(reader);
+        }
+        private User MapToUser(SqlDataReader reader)
+        {
             return new User
             {
                 IdUsuario      = reader.GetInt32(reader.GetOrdinal("id_usuario")),
