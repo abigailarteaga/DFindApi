@@ -28,8 +28,14 @@ namespace DFindApi.Controllers
                 var user = await _repo.RegistrarAsync(request);
                 return Ok(user);
             }
+            catch (InvalidOperationException ex) when (ex.Message == "EMAIL_DUPLICADO")
+            {
+                // 409: conflicto de datos (correo ya existe)
+                return Conflict(new { mensaje = "El correo ya está registrado." });
+            }
             catch (InvalidOperationException ex) when (ex.Message == "CORREO_NO_VERIFICADO")
             {
+                // 400: aún no verificó correo
                 return BadRequest(new { mensaje = "Debes verificar tu correo antes de registrarte." });
             }
             catch (SqlException ex)
@@ -41,6 +47,7 @@ namespace DFindApi.Controllers
                 return StatusCode(500, new { mensaje = ex.Message });
             }
         }
+
 
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)

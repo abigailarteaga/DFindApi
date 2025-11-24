@@ -17,12 +17,6 @@ namespace DFindApi.Data
         }
         public async Task<AuthResponse?> RegistrarAsync(RegisterRequest request)
         {
-            var estaVerificado = await EstaCorreoPreverificadoAsync(request.Correo);
-            if (!estaVerificado)
-            {
-                throw new InvalidOperationException("CORREO_NO_VERIFICADO");
-            }
-
             int idNuevoUsuario;
 
             using (var conn = new SqlConnection(_connectionString))
@@ -34,10 +28,14 @@ namespace DFindApi.Data
                 cmd.Parameters.AddWithValue("@Correo", request.Correo);
                 cmd.Parameters.AddWithValue("@ContrasenaHash", request.ContrasenaHash);
                 cmd.Parameters.AddWithValue("@AceptoTerminos", request.AceptoTerminos);
-                cmd.Parameters.AddWithValue("@VersionTerminos",
-                    (object?)request.VersionTerminos ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@IpAceptacion",
-                    (object?)request.IpAceptacion ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(
+                    "@VersionTerminos",
+                    (object?)request.VersionTerminos ?? DBNull.Value
+                );
+                cmd.Parameters.AddWithValue(
+                    "@IpAceptacion",
+                    (object?)request.IpAceptacion ?? DBNull.Value
+                );
 
                 var idOutput = new SqlParameter("@IdUsuario", SqlDbType.Int)
                 {
@@ -46,12 +44,30 @@ namespace DFindApi.Data
                 cmd.Parameters.Add(idOutput);
 
                 await conn.OpenAsync();
-                await cmd.ExecuteNonQueryAsync();
+
+                try
+                {
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                catch (SqlException ex)
+                {
+                    if (ex.Message.Contains("El correo ya está registrado",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("EMAIL_DUPLICADO");
+                    }
+
+                    if (ex.Message.Contains("Debes verificar tu correo",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("CORREO_NO_VERIFICADO");
+                    }
+
+                    throw;
+                }
 
                 idNuevoUsuario = (int)idOutput.Value;
             }
-
-            await MarcarVerificacionComoUsadaAsync(request.Correo);
 
             var usuario = await ObtenerUsuarioPorCorreoYHashAsync(
                 request.Correo,
@@ -60,6 +76,7 @@ namespace DFindApi.Data
 
             return usuario;
         }
+
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
