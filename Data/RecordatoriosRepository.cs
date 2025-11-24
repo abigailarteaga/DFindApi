@@ -8,16 +8,14 @@ namespace DFindApi.Data
     public class RecordatoriosRepository
     {
         private readonly string _connectionString;
-
-        public RecordatoriosRepository(IConfiguration configuration)
+        private async Task InsertarRecordatorioAsync(
+        SqlConnection conn,
+        SqlTransaction tx,
+        string idRecordatorio,
+        DateTime fecha,
+        RecordatorioRequest request)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                               ?? throw new Exception("Connection string no encontrada.");
-        }
-        public async Task<RecordatorioResponse?> CrearRecordatorioAsync(RecordatorioRequest request)
-        {
-            using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand(@"
+            using var cmd = new SqlCommand(@"
                 INSERT INTO Recordatorios (
                     IdRecordatorio, IdUsuario, Titulo, Descripcion, FechaHora, 
                     Prioridad, Ubicacion, Objeto, EsRepetitivo, FrecuenciaRepeticion, 
@@ -26,31 +24,162 @@ namespace DFindApi.Data
                     @IdRecordatorio, @IdUsuario, @Titulo, @Descripcion, @FechaHora,
                     @Prioridad, @Ubicacion, @Objeto, @EsRepetitivo, @FrecuenciaRepeticion,
                     @Activo, @Color, @RutaImagen, @DiasSeleccionados, SYSUTCDATETIME(), SYSUTCDATETIME()
-                );", conn))
+                );", conn, tx);
+
+            cmd.Parameters.AddWithValue("@IdRecordatorio", idRecordatorio);
+            cmd.Parameters.AddWithValue("@IdUsuario", request.IdUsuario);
+            cmd.Parameters.AddWithValue("@Titulo", request.Titulo);
+            cmd.Parameters.AddWithValue("@Descripcion", (object?)request.Descripcion ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@FechaHora", fecha);
+            cmd.Parameters.AddWithValue("@Prioridad", request.Prioridad);
+            cmd.Parameters.AddWithValue("@Ubicacion", request.Ubicacion);
+            cmd.Parameters.AddWithValue("@Objeto", request.Objeto);
+            cmd.Parameters.AddWithValue("@EsRepetitivo", request.EsRepetitivo);
+            cmd.Parameters.AddWithValue("@FrecuenciaRepeticion", request.FrecuenciaRepeticion);
+            cmd.Parameters.AddWithValue("@Activo", request.Activo);
+            cmd.Parameters.AddWithValue("@Color", request.Color);
+            cmd.Parameters.AddWithValue("@RutaImagen", (object?)request.RutaImagen ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@DiasSeleccionados", request.DiasSeleccionados);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+
+        public RecordatoriosRepository(IConfiguration configuration)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection")
+                               ?? throw new Exception("Connection string no encontrada.");
+        }
+        private IEnumerable<DateTime> CalcularFechasRepeticion(RecordatorioRequest request)
+        {
+            var fechas = new List<DateTime>();
+
+            var fechaInicio = request.FechaHora;
+            var fechaFin = fechaInicio.AddMonths(3);
+
+            var frecuenciaRaw = request.FrecuenciaRepeticion ?? string.Empty;
+            var frecuencia = frecuenciaRaw
+                .Trim()
+                .ToLowerInvariant()
+                .Replace(" ", "")
+                .Replace("_", ""); 
+
+            var diasSeleccionados = ParseDiasSeleccionados(request.DiasSeleccionados);
+
+            if (frecuencia == "diario" || frecuencia == "diaria")
             {
-                var idRecordatorio = request.IdRecordatorio ?? Guid.NewGuid().ToString();
-                
-                cmd.Parameters.AddWithValue("@IdRecordatorio", idRecordatorio);
-                cmd.Parameters.AddWithValue("@IdUsuario", request.IdUsuario);
-                cmd.Parameters.AddWithValue("@Titulo", request.Titulo);
-                cmd.Parameters.AddWithValue("@Descripcion", (object?)request.Descripcion ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@FechaHora", request.FechaHora);
-                cmd.Parameters.AddWithValue("@Prioridad", request.Prioridad);
-                cmd.Parameters.AddWithValue("@Ubicacion", request.Ubicacion);
-                cmd.Parameters.AddWithValue("@Objeto", request.Objeto);
-                cmd.Parameters.AddWithValue("@EsRepetitivo", request.EsRepetitivo);
-                cmd.Parameters.AddWithValue("@FrecuenciaRepeticion", request.FrecuenciaRepeticion);
-                cmd.Parameters.AddWithValue("@Activo", request.Activo);
-                cmd.Parameters.AddWithValue("@Color", request.Color);
-                cmd.Parameters.AddWithValue("@RutaImagen", (object?)request.RutaImagen ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@DiasSeleccionados", request.DiasSeleccionados);
+                var f = fechaInicio.AddDays(1);
 
-                await conn.OpenAsync();
-                await cmd.ExecuteNonQueryAsync();
+                while (f <= fechaFin)
+                {
+                    fechas.Add(f);
+                    f = f.AddDays(1);
+                }
+            }
+            else if (frecuencia == "semanal")
+            {
+                var f = fechaInicio.AddDays(7);
 
-                return await ObtenerRecordatorioPorIdAsync(idRecordatorio);
+                while (f <= fechaFin)
+                {
+                    fechas.Add(f);
+                    f = f.AddDays(7);
+                }
+            }
+            else if (frecuencia == "diassemana")
+            {
+                var f = fechaInicio.AddDays(1);
+
+                while (f <= fechaFin)
+                {
+                    if (diasSeleccionados.Count == 0)
+                    {
+                        if (f.DayOfWeek == fechaInicio.DayOfWeek)
+                        {
+                            fechas.Add(f);
+                        }
+                    }
+                    else
+                    {
+                        if (diasSeleccionados.Contains(f.DayOfWeek))
+                        {
+                            fechas.Add(f);
+                        }
+                    }
+
+                    f = f.AddDays(1);
+                }
+            }
+
+            return fechas;
+        }
+        private static HashSet<DayOfWeek> ParseDiasSeleccionados(string diasSeleccionados)
+        {
+            var resultado = new HashSet<DayOfWeek>();
+
+            if (string.IsNullOrWhiteSpace(diasSeleccionados))
+                return resultado;
+
+            var partes = diasSeleccionados.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var p in partes)
+            {
+                if (int.TryParse(p, out int numeroDia) && numeroDia >= 0 && numeroDia <= 6)
+                {
+                    resultado.Add((DayOfWeek)numeroDia);
+                }
+            }
+
+            return resultado;
+        }
+        public async Task<RecordatorioResponse?> CrearRecordatorioAsync(RecordatorioRequest request)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                var idRecordatorioPrincipal = request.IdRecordatorio ?? Guid.NewGuid().ToString();
+
+                await InsertarRecordatorioAsync(
+                    conn,
+                    tx,
+                    idRecordatorioPrincipal,
+                    request.FechaHora,
+                    request
+                );
+
+                if (request.EsRepetitivo && !string.IsNullOrWhiteSpace(request.FrecuenciaRepeticion))
+                {
+                    var fechasRepeticion = CalcularFechasRepeticion(request);
+
+                    foreach (var fecha in fechasRepeticion)
+                    {
+                        var nuevoId = Guid.NewGuid().ToString();
+
+                        await InsertarRecordatorioAsync(
+                            conn,
+                            tx,
+                            nuevoId,
+                            fecha,
+                            request
+                        );
+                    }
+                }
+
+                tx.Commit();
+
+                return await ObtenerRecordatorioPorIdAsync(idRecordatorioPrincipal);
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
             }
         }
+
 
         public async Task<List<RecordatorioResponse>> ObtenerRecordatoriosPorCorreoAsync(string correo)
         {
