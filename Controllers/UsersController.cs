@@ -9,10 +9,12 @@ namespace DFindApi.Controllers
     public class UsersController : ControllerBase
     {
         private readonly UsersRepository _repo;
+        private readonly AuthRepository _authRepo;
 
-        public UsersController(UsersRepository repo)
+        public UsersController(UsersRepository repo, AuthRepository authRepo)
         {
             _repo = repo;
+            _authRepo = authRepo;
         }
 
         [HttpGet]
@@ -43,16 +45,31 @@ namespace DFindApi.Controllers
 
                 if (tipo == "preset" &&
                     (request.AvatarClave is null ||
-                     !new[] { "avatar1", "avatar2", "avatar3", "avatar4", "avatar5" }
-                        .Contains(request.AvatarClave)))
+                        !new[] { "avatar1", "avatar2", "avatar3", "avatar4", "avatar5" }
+                            .Contains(request.AvatarClave)))
                 {
                     return BadRequest("AvatarClave inválido para tipo 'preset'.");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.NuevoCorreo))
+            {
+                var verificado = await _authRepo.EstaCorreoPreverificadoAsync(request.NuevoCorreo);
+                if (!verificado)
+                {
+                    return BadRequest("Debes verificar el nuevo correo antes de actualizar el perfil.");
                 }
             }
 
             try
             {
                 await _repo.UpdateProfileAsync(request);
+
+                if (!string.IsNullOrWhiteSpace(request.NuevoCorreo))
+                {
+                    await _authRepo.MarcarVerificacionComoUsadaAsync(request.NuevoCorreo);
+                }
+
                 return NoContent();
             }
             catch (InvalidOperationException ex) when (ex.Message == "EMAIL_DUPLICADO")
