@@ -8,7 +8,11 @@ namespace DFindApi.Models
         public string ContrasenaHash { get; set; } = string.Empty;
         public DateTime FechaCreacion { get; set; }
         public string Telefono { get; set; } = string.Empty;
-        public string? AvatarTipo { get; set; }  // "preset" o "initial"
-        public string? AvatarClave { get; set; } // "avatar1".."avatar5" o "#RRGGBB"
+        public string? AvatarTipo { get; set; } 
+        public string? AvatarClave { get; set; } 
+        public decimal? TamanoFuente { get; set; }
+        public bool? ModoOscuro { get; set; }
+        public bool? NotificacionesSonido { get; set; }
+        public bool? NotificacionesVibracion { get; set; }
     }
 }

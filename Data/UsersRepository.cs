@@ -67,14 +67,18 @@ namespace DFindApi.Data
         {
             const string sql = @"
             SELECT
-                u.IdUsuario      AS id_usuario,
-                u.NombreUsuario  AS nombre_usuario,
-                u.Correo         AS email,
-                u.ContrasenaHash AS contrasena_hash,
-                u.RegistradoEl   AS fecha_creacion,
-                ''               AS telefono,      -- si no tienes columna Teléfono
-                u.AvatarTipo     AS avatar_tipo,
-                u.AvatarClave    AS avatar_clave
+                u.IdUsuario               AS id_usuario,
+                u.NombreUsuario           AS nombre_usuario,
+                u.Correo                  AS email,
+                u.ContrasenaHash          AS contrasena_hash,
+                u.RegistradoEl            AS fecha_creacion,
+                ''                        AS telefono,
+                u.AvatarTipo              AS avatar_tipo,
+                u.AvatarClave             AS avatar_clave,
+                u.TamanoFuente            AS tamano_fuente,
+                u.ModoOscuro              AS modo_oscuro,
+                u.NotificacionesSonido    AS notificaciones_sonido,
+                u.NotificacionesVibracion AS notificaciones_vibracion
             FROM dbo.Usuarios u
             WHERE u.Correo = @Correo;";
 
@@ -110,7 +114,23 @@ namespace DFindApi.Data
                 AvatarClave    = reader.IsDBNull(reader.GetOrdinal("avatar_clave"))
                                     ? null
                                     : reader.GetString(reader.GetOrdinal("avatar_clave")),
+
+                TamanoFuente = reader.IsDBNull(reader.GetOrdinal("tamano_fuente"))
+                                    ? (decimal?)null
+                                    : reader.GetDecimal(reader.GetOrdinal("tamano_fuente")),
+                ModoOscuro = reader.IsDBNull(reader.GetOrdinal("modo_oscuro"))
+                                    ? (bool?)null
+                                    : reader.GetBoolean(reader.GetOrdinal("modo_oscuro")),
+                NotificacionesSonido =
+                    reader.IsDBNull(reader.GetOrdinal("notificaciones_sonido"))
+                        ? (bool?)null
+                        : reader.GetBoolean(reader.GetOrdinal("notificaciones_sonido")),
+                NotificacionesVibracion =
+                    reader.IsDBNull(reader.GetOrdinal("notificaciones_vibracion"))
+                        ? (bool?)null
+                        : reader.GetBoolean(reader.GetOrdinal("notificaciones_vibracion")),
             };
         }
+
     }
 }
