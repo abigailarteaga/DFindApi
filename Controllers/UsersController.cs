@@ -26,7 +26,7 @@ namespace DFindApi.Controllers
             var user = await _repo.GetByEmailAsync(correo);
 
             if (user == null)
-                return NotFound($"Usuario con correo {correo} no encontrado.");
+                return NotFound("El usuario no existe.");
 
             return Ok(user);
         }
