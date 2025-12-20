@@ -10,7 +10,7 @@ namespace DFindApi.Data
         private readonly string _connectionString;
         private async Task InsertarRecordatorioAsync(
         SqlConnection conn,
-        SqlTransaction tx,
+        SqlTransaction? tx,
         string idRecordatorio,
         DateTime fecha,
         RecordatorioRequest request)
@@ -113,6 +113,63 @@ namespace DFindApi.Data
 
             return fechas;
         }
+        private DateTime? CalcularSiguienteFecha(RecordatorioResponse recordatorio)
+        {
+            var fechaBase = recordatorio.FechaHora;
+            var frecuencia = recordatorio.FrecuenciaRepeticion?.Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "") ?? "";
+            var diasSeleccionados = ParseDiasSeleccionados(recordatorio.DiasSeleccionados);
+
+            if (frecuencia == "diario" || frecuencia == "diaria")
+            {
+                return fechaBase.AddDays(1);
+            }
+            else if (frecuencia == "semanal")
+            {
+                if (diasSeleccionados.Count > 1)
+                {
+                    // Si hay varios días seleccionados, usar lógica de diassemana
+                    var diaActual = fechaBase.DayOfWeek;
+                    var diasOrdenados = diasSeleccionados.OrderBy(d => d).ToList();
+                    var siguienteDia = diasOrdenados.FirstOrDefault(d => d > diaActual);
+                    if (siguienteDia != default)
+                    {
+                        var diasDiff = (int)siguienteDia - (int)diaActual;
+                        return fechaBase.AddDays(diasDiff);
+                    }
+                    else
+                    {
+                        // Siguiente semana, primer día
+                        var primerDia = diasOrdenados.First();
+                        var diasDiff = 7 - (int)diaActual + (int)primerDia;
+                        return fechaBase.AddDays(diasDiff);
+                    }
+                }
+                else
+                {
+                    return fechaBase.AddDays(7);
+                }
+            }
+            else if (frecuencia == "diassemana")
+            {
+                if (diasSeleccionados.Count == 0) return null;
+                var diaActual = fechaBase.DayOfWeek;
+                var diasOrdenados = diasSeleccionados.OrderBy(d => d).ToList();
+                var siguienteDia = diasOrdenados.FirstOrDefault(d => d > diaActual);
+                if (siguienteDia != default)
+                {
+                    var diasDiff = (int)siguienteDia - (int)diaActual;
+                    return fechaBase.AddDays(diasDiff);
+                }
+                else
+                {
+                    // Siguiente semana, primer día
+                    var primerDia = diasOrdenados.First();
+                    var diasDiff = 7 - (int)diaActual + (int)primerDia;
+                    return fechaBase.AddDays(diasDiff);
+                }
+            }
+            return null;
+        }
         private static HashSet<DayOfWeek> ParseDiasSeleccionados(string diasSeleccionados)
         {
             var resultado = new HashSet<DayOfWeek>();
@@ -151,23 +208,8 @@ namespace DFindApi.Data
                     request
                 );
 
-                if (request.EsRepetitivo && !string.IsNullOrWhiteSpace(request.FrecuenciaRepeticion))
-                {
-                    var fechasRepeticion = CalcularFechasRepeticion(request);
-
-                    foreach (var fecha in fechasRepeticion)
-                    {
-                        var nuevoId = Guid.NewGuid().ToString();
-
-                        await InsertarRecordatorioAsync(
-                            conn,
-                            tx,
-                            nuevoId,
-                            fecha,
-                            request
-                        );
-                    }
-                }
+                // Removido: creación de múltiples recordatorios para repeticiones
+                // Ahora solo se crea uno, y el siguiente se genera al completar
 
                 tx.Commit();
 
@@ -328,6 +370,57 @@ namespace DFindApi.Data
             return await ObtenerRecordatorioPorTituloAsync(titulo);
         }
 
+        public async Task<RecordatorioResponse?> CambiarEstadoPorIdAsync(string idRecordatorio)
+        {
+            var recordatorioActual = await ObtenerRecordatorioPorIdAsync(idRecordatorio);
+            
+            if (recordatorioActual == null)
+                return null;
+
+            var nuevoEstado = !recordatorioActual.Activo;
+
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"
+                UPDATE Recordatorios 
+                SET Activo = @NuevoEstado, ActualizadoEl = SYSUTCDATETIME()
+                WHERE IdRecordatorio = @IdRecordatorio;", conn))
+            {
+                cmd.Parameters.AddWithValue("@NuevoEstado", nuevoEstado);
+                cmd.Parameters.AddWithValue("@IdRecordatorio", idRecordatorio);
+
+                await conn.OpenAsync();
+                await cmd.ExecuteNonQueryAsync();
+
+                // Si se está completando un recordatorio repetitivo, crear el siguiente
+                if (nuevoEstado == false && recordatorioActual.EsRepetitivo)
+                {
+                    var siguienteFecha = CalcularSiguienteFecha(recordatorioActual);
+                    if (siguienteFecha.HasValue)
+                    {
+                        var nuevoRequest = new RecordatorioRequest
+                        {
+                            IdUsuario = recordatorioActual.IdUsuario,
+                            Titulo = recordatorioActual.Titulo,
+                            Descripcion = recordatorioActual.Descripcion,
+                            FechaHora = siguienteFecha.Value,
+                            Prioridad = recordatorioActual.Prioridad,
+                            Ubicacion = recordatorioActual.Ubicacion,
+                            Objeto = recordatorioActual.Objeto,
+                            EsRepetitivo = true,
+                            FrecuenciaRepeticion = recordatorioActual.FrecuenciaRepeticion,
+                            Activo = true,
+                            Color = recordatorioActual.Color,
+                            RutaImagen = recordatorioActual.RutaImagen,
+                            DiasSeleccionados = recordatorioActual.DiasSeleccionados
+                        };
+                        await InsertarRecordatorioAsync(conn, null, Guid.NewGuid().ToString(), siguienteFecha.Value, nuevoRequest);
+                    }
+                }
+            }
+
+            return await ObtenerRecordatorioPorIdAsync(idRecordatorio);
+        }
+
         public async Task<bool> EliminarRecordatorioPorTituloAsync(string titulo)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -346,7 +439,7 @@ namespace DFindApi.Data
 
         public async Task<RecordatorioResponse?> CambiarEstadoPorTituloAsync(string titulo)
         {
-            var recordatorioActual = await ObtenerRecordatorioPorTituloAsync(titulo);
+            var recordatorioActual = await ObtenerProximoRecordatorioActivoPorTituloAsync(titulo);
             
             if (recordatorioActual == null)
                 return null;
@@ -357,16 +450,42 @@ namespace DFindApi.Data
             using (var cmd = new SqlCommand(@"
                 UPDATE Recordatorios 
                 SET Activo = @NuevoEstado, ActualizadoEl = SYSUTCDATETIME()
-                WHERE Titulo = @Titulo;", conn))
+                WHERE IdRecordatorio = @IdRecordatorio;", conn))
             {
                 cmd.Parameters.AddWithValue("@NuevoEstado", nuevoEstado);
-                cmd.Parameters.AddWithValue("@Titulo", titulo);
+                cmd.Parameters.AddWithValue("@IdRecordatorio", recordatorioActual.IdRecordatorio);
 
                 await conn.OpenAsync();
                 await cmd.ExecuteNonQueryAsync();
+
+                // Si se está completando un recordatorio repetitivo, crear el siguiente
+                if (nuevoEstado == false && recordatorioActual.EsRepetitivo)
+                {
+                    var siguienteFecha = CalcularSiguienteFecha(recordatorioActual);
+                    if (siguienteFecha.HasValue)
+                    {
+                        var nuevoRequest = new RecordatorioRequest
+                        {
+                            IdUsuario = recordatorioActual.IdUsuario,
+                            Titulo = recordatorioActual.Titulo,
+                            Descripcion = recordatorioActual.Descripcion,
+                            FechaHora = siguienteFecha.Value,
+                            Prioridad = recordatorioActual.Prioridad,
+                            Ubicacion = recordatorioActual.Ubicacion,
+                            Objeto = recordatorioActual.Objeto,
+                            EsRepetitivo = true,
+                            FrecuenciaRepeticion = recordatorioActual.FrecuenciaRepeticion,
+                            Activo = true,
+                            Color = recordatorioActual.Color,
+                            RutaImagen = recordatorioActual.RutaImagen,
+                            DiasSeleccionados = recordatorioActual.DiasSeleccionados
+                        };
+                        await InsertarRecordatorioAsync(conn, null, Guid.NewGuid().ToString(), siguienteFecha.Value, nuevoRequest);
+                    }
+                }
             }
 
-            return await ObtenerRecordatorioPorTituloAsync(titulo);
+            return await ObtenerRecordatorioPorIdAsync(recordatorioActual.IdRecordatorio);
         }
 
         private async Task<RecordatorioResponse?> ObtenerRecordatorioPorTituloAsync(string titulo)
@@ -420,6 +539,47 @@ namespace DFindApi.Data
                 WHERE IdRecordatorio = @IdRecordatorio;", conn))
             {
                 cmd.Parameters.AddWithValue("@IdRecordatorio", idRecordatorio);
+
+                await conn.OpenAsync();
+                using var reader = await cmd.ExecuteReaderAsync();
+
+                if (!await reader.ReadAsync())
+                    return null;
+
+                return new RecordatorioResponse
+                {
+                    IdRecordatorio = reader["IdRecordatorio"].ToString() ?? "",
+                    IdUsuario = (int)reader["IdUsuario"],
+                    Titulo = reader["Titulo"].ToString() ?? "",
+                    Descripcion = reader["Descripcion"].ToString() ?? "",
+                    FechaHora = (DateTime)reader["FechaHora"],
+                    Prioridad = reader["Prioridad"].ToString() ?? "",
+                    Ubicacion = reader["Ubicacion"].ToString() ?? "",
+                    Objeto = reader["Objeto"].ToString() ?? "",
+                    EsRepetitivo = (bool)reader["EsRepetitivo"],
+                    FrecuenciaRepeticion = reader["FrecuenciaRepeticion"].ToString() ?? "",
+                    Activo = (bool)reader["Activo"],
+                    Color = reader["Color"].ToString() ?? "",
+                    RutaImagen = reader["RutaImagen"] as string,
+                    DiasSeleccionados = reader["DiasSeleccionados"].ToString() ?? "",
+                    CreadoEl = (DateTime)reader["CreadoEl"],
+                    ActualizadoEl = (DateTime)reader["ActualizadoEl"]
+                };
+            }
+        }
+
+        private async Task<RecordatorioResponse?> ObtenerProximoRecordatorioActivoPorTituloAsync(string titulo)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"
+                SELECT TOP 1 IdRecordatorio, IdUsuario, Titulo, Descripcion, FechaHora,
+                       Prioridad, Ubicacion, Objeto, EsRepetitivo, FrecuenciaRepeticion,
+                       Activo, Color, RutaImagen, DiasSeleccionados, CreadoEl, ActualizadoEl
+                FROM Recordatorios
+                WHERE Titulo = @Titulo AND Activo = 1
+                ORDER BY FechaHora ASC;", conn))
+            {
+                cmd.Parameters.AddWithValue("@Titulo", titulo);
 
                 await conn.OpenAsync();
                 using var reader = await cmd.ExecuteReaderAsync();
